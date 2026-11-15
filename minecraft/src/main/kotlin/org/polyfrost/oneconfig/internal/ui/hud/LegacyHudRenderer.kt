@@ -71,8 +71,9 @@ object LegacyHudRenderer {
             val hud = instances[i]
             if (hud !is LegacyHud) continue
             if (!HudManager.isEditing) {
-                if (hud.hidden) continue
+                if (hud.effectivelyHidden && !hud.drawsWhileHidden()) continue
                 if (HudManager.isGuiHidden) continue
+                if (HudManager.allHudsHiddenByKey) continue
                 if (HudManager.isDebugScreenVisible && !hud.showInF3) continue
                 if (HudManager.isTabListVisible && !hud.showInTab) continue
                 if (!HudManager.overrideShowInScreens) {
