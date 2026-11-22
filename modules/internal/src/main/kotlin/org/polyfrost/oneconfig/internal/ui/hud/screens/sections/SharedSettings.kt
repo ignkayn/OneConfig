@@ -87,13 +87,15 @@ fun SharedLayout(huds: Collection<Hud>, query: String, group: HudGroup? = null) 
     }
 }
 
+private val SINGLE_BACKGROUND_HIDDEN = setOf("merge")
+
 /** The Style tab for [huds] */
 @Composable
-fun SharedStyle(huds: Collection<Hud>, query: String) {
+fun SharedStyle(huds: Collection<Hud>, query: String, group: HudGroup? = null) {
     SharedContent(huds) { list, edits ->
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SharedCard(SharedSection.Text, list, query, edits)
-            SharedCard(SharedSection.Background, list, query, edits)
+            SharedCard(SharedSection.Background, list, query, edits, group)
         }
     }
 }
@@ -152,7 +154,7 @@ private fun PositionAndScale(huds: List<Hud>, query: String, group: HudGroup?) {
 
 /** The options of [section] that every HUD has, laid out in the panel grid with switches and segmented choices on rows of their own */
 @Composable
-private fun SharedCard(section: SharedSection, huds: List<Hud>, query: String, edits: SharedEdits) {
+private fun SharedCard(section: SharedSection, huds: List<Hud>, query: String, edits: SharedEdits, group: HudGroup? = null) {
     val options = SharedOptions.shared(section, huds)
     if (options.isEmpty()) return
     // the background card's own switch turns the whole card on or off
@@ -160,8 +162,12 @@ private fun SharedCard(section: SharedSection, huds: List<Hud>, query: String, e
     // read so the card reads the HUDs again after an edit
     edits.revision
     val masterValue = master?.resolve(huds)
+    val groupBackgroundLabel = hudPanelText("group_background", "One background for the group")
+    val singleBackground = section == SharedSection.Background && group != null && HudGroups.hasSingleBackground(group)
+    val backgroundTakenOver = group != null && HudGroups.isBackgroundTakenOver(group)
     CardSection(
         section.title, query, *options.map { it.label }.toTypedArray(),
+        *if (section == SharedSection.Background && group != null) arrayOf(groupBackgroundLabel) else emptyArray(),
         checked = masterValue?.isOn(),
         mixed = masterValue?.isMixed() == true,
         onCheckedChange = { master?.apply(huds, it); edits.bump() },
@@ -182,8 +188,16 @@ private fun SharedCard(section: SharedSection, huds: List<Hud>, query: String, e
             cells.clear()
         }
 
+        if (section == SharedSection.Background && group != null) {
+            SwitchRow(groupBackgroundLabel, singleBackground, false, enabled = !backgroundTakenOver) {
+                HudGroups.setSingleBackground(group, it)
+                edits.bump()
+            }
+        }
+
         for (option in options) {
             if (option === master || !SharedOptions.isShown(option, huds)) continue
+            if (singleBackground && option.id in SINGLE_BACKGROUND_HIDDEN) continue
             when {
                 option is SharedToggle -> {
                     flush()
