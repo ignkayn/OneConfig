@@ -40,7 +40,6 @@ import org.polyfrost.oneconfig.api.hud.v1.HudManager;
 import org.polyfrost.oneconfig.api.platform.v1.internal.CompatibilityPlatformImpl;
 import org.polyfrost.oneconfig.internal.ui.api.ConfigRegistry;
 import org.polyfrost.oneconfig.internal.ui.api.ConfigSource;
-import org.polyfrost.oneconfig.internal.ui.keybind.MinecraftKeybindProfiles;
 
 /**
  * OneConfig's part in Hotwire turning mods off and on, adding and updating them while the game runs. Hotwire takes a
@@ -77,7 +76,6 @@ public final class HotwireLifecycle implements ModLifecycleListener {
             refreshMods();
             ConfigManager.rebindDetached();
             HudManager.INSTANCE.reloadForNewProviders();
-            MinecraftKeybindProfiles.reapply();
             ConfigRegistry.INSTANCE.loadFrom(ConfigManager.active(), ConfigSource.OC);
         } catch (Throwable t) {
             LOGGER.error("Failed to bind {} to the active profile after Hotwire turned them on", ids, t);
@@ -100,7 +98,6 @@ public final class HotwireLifecycle implements ModLifecycleListener {
         try {
             if (ok) {
                 ConfigEntrypoints.registerStarted(ids);
-                MinecraftKeybindProfiles.reapply();
             } else {
                 ConfigManager.pendingConfigs().forEach(ConfigManager::cancelInitialization);
             }

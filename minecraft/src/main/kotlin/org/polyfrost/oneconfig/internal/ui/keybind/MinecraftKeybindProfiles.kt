@@ -116,16 +116,6 @@ object MinecraftKeybindProfiles : ConfigManager.ProfileChangeListener {
         }
     }
 
-    /**
-     * Applies the active profile's controls again, to key mappings that were not there when they last were, such as
-     * those of a mod that Hotwire turned on after the profile changed
-     */
-    @JvmStatic
-    fun reapply() {
-        val owner = modeTransitions.liveOwner() ?: return
-        if (owner.separateControls) apply(owner.profile)
-    }
-
     @JvmStatic
     fun onOptionsSaved() {
         if (!initialized) return
