@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Needs PolyCompose 3.0.7 or newer
 - Player heads use PolyCompose's skin cache, so mods drawing the same player only load the skin once
 - Player heads update when a skin finishes loading late
-- Marked as incompatible with Hotwire versions below 0.9.2-beta
+- Marked as incompatible with Hotwire versions below 0.9.5.4-beta
 - API: `PlayerHeads`' skin calls, `PlayerSkinLayers` and `PlayerSkinLayersResult` are deprecated in favour of PolyCompose's `McPlayerFaces`. Mods built against older versions keep working
 
 ### Fixed
