@@ -17,7 +17,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Needs PolyCompose 3.1.0 or newer
-- Focus rings are drawn just outside buttons and fields instead of over their edges, so they no longer cover text
 - Player heads use PolyCompose's skin cache, so mods drawing the same player only load the skin once
 - Player heads update when a skin finishes loading late
 - API: `PlayerHeads`' skin calls, `PlayerSkinLayers` and `PlayerSkinLayersResult` are deprecated in favour of PolyCompose's `McPlayerFaces`. Mods built against older versions keep working
