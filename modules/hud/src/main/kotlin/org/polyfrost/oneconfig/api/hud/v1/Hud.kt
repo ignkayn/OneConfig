@@ -1344,22 +1344,33 @@ public abstract class Hud(
             hasBackground() && canMergeBackground() && this !is LegacyHudMarker
 
     /**
-     * `true` while this HUD's background is being drawn as part of a fused neighbour shape by
-     * [HudManager]
+     * `true` while OneConfig draws this HUD's background as part of a fused or whole-group shape
      *
-     * A HUD which draws its own background **must** skip it while this is set
-     *
-     * Otherwise the background ends up drawn twice once by the fused shape and once by the HUD
-     * itself
-     *
-     * Prefer [hudBackground] which already accounts for this
+     * A HUD which draws its own background **must** skip it while this is set, see [hudBackground]
      */
-    public var bgMerged: Boolean
-        get() = _bgMerged.value
-        internal set(v) { _bgMerged.put(v) }
+    public val bgMerged: Boolean get() = _bgFused.value || _bgGrouped.value
 
     @Transient
-    private var _bgMerged: MutableState<Boolean> = mutableStateOf(false)
+    private var _bgFused: MutableState<Boolean> = mutableStateOf(false)
+
+    @get:ApiStatus.Internal
+    public var bgFused: Boolean
+        get() = _bgFused.value
+        internal set(v) { _bgFused.put(v) }
+
+    @Transient
+    private var _bgGrouped: MutableState<Boolean> = mutableStateOf(false)
+
+    internal var bgGrouped: Boolean
+        get() = _bgGrouped.value
+        set(v) { _bgGrouped.put(v) }
+
+    private var _groupBackground: MutableState<String> = mutableStateOf("")
+
+    /** The id of the group whose single shared background this HUD is drawn on, or empty for none, see [HudGroups.setSingleBackground] */
+    @get:ApiStatus.Experimental
+    @set:ApiStatus.Experimental
+    public var groupBackground: String get() = _groupBackground.value; set(v) { _groupBackground.put(v) }
 
     private var _textColor: MutableState<Int> = mutableStateOf(0xFFFFFFFF.toInt())
     public var textColor: Int get() = _textColor.value; set(v) { _textColor.value = v }
@@ -1821,6 +1832,7 @@ public abstract class Hud(
                 tree["anchorOffsetY"] = ktProperty(out::anchorOffsetY).apply { addDisplayCondition(hideFromConfigUi) }
                 tree["movedByPlayer"] = ktProperty(out::movedByPlayer).apply { addDisplayCondition(hideFromConfigUi) }
                 tree["groupPath"] = ktProperty(out::groupPath).apply { addDisplayCondition(hideFromConfigUi) }
+                tree["groupBackground"] = ktProperty(out::groupBackground).apply { addDisplayCondition(hideFromConfigUi) }
             }
             tree["toggleKey"] = ktProperty(out::toggleKey).apply { addDisplayCondition(hideFromConfigUi) }
             tree["showKey"] = ktProperty(out::showKey).apply { addDisplayCondition(hideFromConfigUi) }
@@ -2108,7 +2120,9 @@ public abstract class Hud(
         _mergeDiagonally = mutableStateOf(this@Hud.mergeDiagonally)
         _mergeAcrossColours = mutableStateOf(this@Hud.mergeAcrossColours)
         _keepBgWhenHidden = mutableStateOf(this@Hud.keepBgWhenHidden)
-        _bgMerged = mutableStateOf(false)
+        _bgFused = mutableStateOf(false)
+        _bgGrouped = mutableStateOf(false)
+        _groupBackground = mutableStateOf(this@Hud.groupBackground)
         _textColor = mutableStateOf(this@Hud.textColor)
         _textChroma = mutableStateOf(this@Hud.textChroma)
         _textChromaSpeed = mutableStateOf(this@Hud.textChromaSpeed)
