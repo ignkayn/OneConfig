@@ -9,11 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - API: `HudManager.viewport` draws the HUDs into one part of the window, for mods that show the game in a smaller frame such as a replay editor's preview
+- Mods that [Hotwire](https://modrinth.com/mod/irenehotwire) turns off, turns on, adds or updates while the game runs keep their settings, mod cards and HUDs, including when a profile was switched to, created or renamed while they were off
+- API: `oneconfig:config` entrypoints of mods that Hotwire adds or updates while the game runs are run as the mod starts
 
 ### Changed
 - Needs PolyCompose 3.0.7 or newer
 - Player heads use PolyCompose's skin cache, so mods drawing the same player only load the skin once
 - Player heads update when a skin finishes loading late
+- Marked as incompatible with Hotwire versions below 0.9.5.4-beta
 - API: `PlayerHeads`' skin calls, `PlayerSkinLayers` and `PlayerSkinLayersResult` are deprecated in favour of PolyCompose's `McPlayerFaces`. Mods built against older versions keep working
 
 ### Fixed

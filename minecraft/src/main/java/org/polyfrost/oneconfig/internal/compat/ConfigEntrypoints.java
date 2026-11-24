@@ -49,6 +49,7 @@ import org.polyfrost.oneconfig.api.config.v1.Config;
 import org.polyfrost.oneconfig.api.config.v1.ConfigEntrypoint;
 import org.polyfrost.oneconfig.api.config.v1.ConfigManager;
 import org.polyfrost.oneconfig.api.config.v1.Tree;
+import org.polyfrost.oneconfig.api.platform.v1.internal.CompatibilityPlatformImpl;
 import org.polyfrost.oneconfig.api.platform.v1.ModInfo;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
@@ -76,6 +77,7 @@ public final class ConfigEntrypoints {
     // keyed so a hook that fires more than once before the mod is decided is only retried once
     private static final Map<String, Map<Object, Skipped>> skippedExtractions = new HashMap<>();
     private static final AtomicBoolean registered = new AtomicBoolean();
+    private static final AtomicBoolean listening = new AtomicBoolean();
     private static final Map<String, String> treeOwners = new ConcurrentHashMap<>();
     // configs claimed only because they existed before the entrypoint ran, which do not count when it threw
     private static final Set<String> earlierConfigs = ConcurrentHashMap.newKeySet();
@@ -152,8 +154,7 @@ public final class ConfigEntrypoints {
     public static void registerAll() {
         if (!registered.compareAndSet(false, true)) return;
         if (providers().isEmpty()) return;
-        ConfigManager.addTreeRegistrationListener(ConfigEntrypoints::onTreeRegistered);
-        ConfigManager.addConfigSubmissionListener(ConfigEntrypoints::onConfigSubmitted);
+        listen();
         claimEarlierConfigs();
         // a mod may name more than one entrypoint, which only decide together whether its original is extracted
         Map<String, List<Provider>> byMod = new LinkedHashMap<>();
@@ -161,12 +162,99 @@ public final class ConfigEntrypoints {
         byMod.forEach((modId, entrypoints) -> undecided.put(modId, register(modId, entrypoints)));
     }
 
+    private static void listen() {
+        if (!listening.compareAndSet(false, true)) return;
+        ConfigManager.addTreeRegistrationListener(ConfigEntrypoints::onTreeRegistered);
+        ConfigManager.addConfigSubmissionListener(ConfigEntrypoints::onConfigSubmitted);
+    }
+
+    /**
+     * Runs the entrypoints of mods that Hotwire started after the game did, to be decided by the next
+     * {@link #finishStarted()}. A mod that was already decided is left alone, as it only gained other entrypoints.
+     * A copy is not, as {@link #startOver} was called for it.
+     * <br>
+     * shortcut: a second config entrypoint that an update adds to a decided mod only runs at the next launch, track
+     * which definitions ran if a mod ever does that
+     */
+    public static void registerStarted(Collection<String> modIds) {
+        // registerAll has not run yet and will find them itself
+        if (!registered.get()) return;
+        Set<String> started = new HashSet<>();
+        for (String id : modIds) started.add(CompatibilityPlatformImpl.liveCopies.getOrDefault(id, id));
+        Map<String, List<Provider>> byMod = new LinkedHashMap<>();
+        for (Provider provider : providers()) {
+            if (started.contains(provider.modId) && !isDecided(provider.modId)) byMod.computeIfAbsent(provider.modId, k -> new ArrayList<>()).add(provider);
+        }
+        if (byMod.isEmpty()) return;
+        listen();
+        claimEarlierConfigs();
+        byMod.forEach((modId, entrypoints) -> {
+            // as CompatLoader did for the providers it saw when it initialized
+            CompatLoader.INSTANCE.getNativeLoadedConfigs().add(modId);
+            undecided.put(modId, register(modId, entrypoints));
+        });
+    }
+
+    /**
+     * Lets the copies among the mods that Hotwire is about to start be decided and extracted anew, as the configs
+     * of the mods they stand in for went out with those
+     */
+    public static void startOver(Collection<String> modIds) {
+        for (String id : modIds) {
+            String original = CompatibilityPlatformImpl.liveCopies.get(id);
+            if (original == null) continue;
+            forgetDecision(original);
+            CompatLoader.INSTANCE.getNativeLoadedConfigs().remove(original);
+        }
+    }
+
+    /**
+     * Lets the entrypoints of mods run again whose start Hotwire took back, for when they are started once more
+     */
+    public static void forgetStarted(Collection<String> modIds) {
+        for (String id : modIds) {
+            // a mod that is still there only failed to start what an update added to it
+            if (FabricLoader.getInstance().isModLoaded(id)) continue;
+            undecided.remove(id);
+            forgetDecision(id);
+            // or the config of the next jar added under this id would not be extracted
+            CompatLoader.INSTANCE.getNativeLoadedConfigs().remove(id);
+        }
+    }
+
+    private static synchronized void forgetDecision(String modId) {
+        succeeded.remove(modId);
+        failed.remove(modId);
+    }
+
+    /**
+     * Looks the entrypoints up again at their next use, for when the mods that provide them changed
+     */
+    static void forgetProviders() {
+        synchronized (DISCOVERY_LOCK) {
+            providers = null;
+        }
+        defaultOpeners.clear();
+    }
+
     /**
      * Decides for each mod that ran an entrypoint whether to keep its configs or extract its original. Called after
      * {@link ConfigManager#initialize()}, as a config only counts once its tree was built and registered.
      */
-    // compat waits for this, so it always ends by releasing it even if deciding a mod threw
     public static void finishRegistration() {
+        finishRegistration(true);
+    }
+
+    /**
+     * As {@link #finishRegistration()} for {@link #registerStarted}, where a provider that has not run is left alone,
+     * as it may be of a mod that Hotwire is yet to start
+     */
+    public static void finishStarted() {
+        finishRegistration(false);
+    }
+
+    // compat waits for this, so it always ends by releasing it even if deciding a mod threw
+    private static void finishRegistration(boolean all) {
         try {
             Map<String, Boolean> pending = new LinkedHashMap<>(undecided);
             undecided.clear();
@@ -185,7 +273,7 @@ public final class ConfigEntrypoints {
             });
             // providers registerAll never reached, such as when it threw partway, would otherwise stay skipped forever
             for (String modId : providerIds()) {
-                if (pending.containsKey(modId) || isDecided(modId)) continue;
+                if (!all || pending.containsKey(modId) || isDecided(modId)) continue;
                 LOGGER.warn("The OneConfig config entrypoint of {} never ran, extracting its original config instead", modId);
                 try {
                     fallBackToOriginal(modId);
@@ -497,8 +585,9 @@ public final class ConfigEntrypoints {
             List<Provider> found = new ArrayList<>();
             try {
                 for (EntrypointContainer<ConfigEntrypoint> container : FabricLoader.getInstance().getEntrypointContainers(ConfigEntrypoint.ENTRYPOINT, ConfigEntrypoint.class)) {
+                    String id = container.getProvider().getMetadata().getId();
                     found.add(new Provider(
-                            container.getProvider().getMetadata().getId(),
+                            CompatibilityPlatformImpl.liveCopies.getOrDefault(id, id),
                             container.getDefinition(),
                             container::getEntrypoint
                     ));
