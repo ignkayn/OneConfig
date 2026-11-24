@@ -1619,7 +1619,7 @@ fun HudDesignStudio(visible: Boolean = true) {
         HudDesignSession.enteredGroup = enteredGroup
     }
 
-    val providers = remember(HudManager.revision) { HudManager.providers().toList() }
+    val providers = remember { HudManager.providers().toList() }
     fun libraryHuds() = providers.filter { it.addableToLibrary }
     fun libraryModIds(huds: List<Hud> = libraryHuds()) = huds.mapNotNull { it.configId }.distinct()
     val addable = libraryHuds()
