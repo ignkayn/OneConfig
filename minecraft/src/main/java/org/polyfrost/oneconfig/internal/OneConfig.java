@@ -38,6 +38,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.scores.Scoreboard;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.polyfrost.compose.host.controller.ControllerButton;
+import org.polyfrost.compose.host.controller.Controllers;
 import org.polyfrost.oneconfig.api.commands.v1.CommandManager;
 import org.polyfrost.oneconfig.api.config.v1.CompatSnapshots;
 import org.polyfrost.oneconfig.api.config.v1.ConfigManager;
@@ -110,6 +112,7 @@ import org.polyfrost.oneconfig.internal.compat.WWaypointsCompat;
 public class OneConfig implements ClientModInitializer {
     public static final OneConfig INSTANCE = new OneConfig();
     private static final Logger LOGGER = LogManager.getLogger("OneConfig");
+    private static final String CONTROLLER_CATEGORY = "oneconfig.controller.category";
     private boolean initialized = false;
 
     public static boolean isInitialized() {
@@ -152,6 +155,10 @@ public class OneConfig implements ClientModInitializer {
         // is lost when the keybind is deserialized
         OneConfigConfig.setOpenAction(pressed -> openFromKeybind(pressed, OneConfigUIScreen::openLastSession));
         OneConfigConfig.setMinimalOpenAction(pressed -> openFromKeybind(pressed, () -> Platform.screen().display(OneConfigUIScreen.minimal())));
+        Controllers.register("oneconfig:open_menu", "oneconfig.controller.open_menu", ControllerButton.NONE, CONTROLLER_CATEGORY, true)
+                .onPress(() -> openFromKeybind(true, OneConfigUIScreen::openLastSession));
+        Controllers.register("oneconfig:open_hud_editor", "oneconfig.controller.open_hud_editor", ControllerButton.NONE, CONTROLLER_CATEGORY, true)
+                .onPress(() -> openFromKeybind(true, HudManager.INSTANCE::openEditor));
     }
 
     private static boolean openFromKeybind(boolean pressed, Runnable open) {
