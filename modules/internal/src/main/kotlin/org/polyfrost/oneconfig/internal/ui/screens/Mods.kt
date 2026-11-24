@@ -61,6 +61,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import org.polyfrost.compose.host.controller.ControllerButton
 import org.polyfrost.oneconfig.api.config.v1.Config
 import org.polyfrost.oneconfig.api.config.v1.Property
 import org.polyfrost.oneconfig.api.config.v1.Tree
@@ -95,7 +96,9 @@ import org.polyfrost.oneconfig.api.ui.v1.components.TabStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipBox
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
 import org.polyfrost.oneconfig.api.ui.v1.components.contextMenu
+import org.polyfrost.oneconfig.api.ui.v1.components.controllerShortcut
 import org.polyfrost.oneconfig.api.ui.v1.components.hiddenUntilHover
+import org.polyfrost.oneconfig.api.ui.v1.components.keyNavigable
 import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
 import org.polyfrost.oneconfig.api.ui.v1.components.rememberGridReorderState
 import org.polyfrost.oneconfig.api.ui.v1.components.reorderAutoScroll
@@ -626,14 +629,32 @@ fun ModCard(
         }
     }
 
+    val flip = {
+        if (toggle != null) {
+            if (!enabled && toggle.needsSetup()) {
+                open()
+            } else {
+                toggle.setEnabled(!enabled)
+                enabled = toggle.isEnabled()
+            }
+        }
+    }
+
     Card(
         modifier = modifier.fillMaxWidth().height(140.dp)
             .then(
                 if (interactive) {
                     // cards never take focus, otherwise they slide in from off screen when scrolled back into view
                     Modifier
-                        .focusProperties { canFocus = false }
+                        .keyNavigable()
                         .contextMenu { modCardMenu(mod, navigation) }
+                        .controllerShortcut(
+                            ControllerButton.Y,
+                            if (enabled) "oneconfig.controller.turn_off" else "oneconfig.controller.turn_on",
+                            if (enabled) "Turn off" else "Turn on",
+                            enabled = toggle != null && !locked,
+                            onPress = flip,
+                        )
                 } else {
                     Modifier
                 },
@@ -687,14 +708,7 @@ fun ModCard(
                                 .focusProperties { canFocus = false }
                                 .oneConfigClickable(
                                     mod.title.asRenderText(),
-                                    {
-                                        if (!enabled && toggle.needsSetup()) {
-                                            open()
-                                        } else {
-                                            toggle.setEnabled(!enabled)
-                                            enabled = toggle.isEnabled()
-                                        }
-                                    },
+                                    flip,
                                     role = A11yRole.Switch,
                                     checked = enabled,
                                     indication = false,
